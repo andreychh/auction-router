@@ -38,6 +38,7 @@ func NewOutcome(
 }
 
 // Answered counts the invited partners that answered inside the time allowed.
+// It assumes every unanswered partner is one of the matched.
 func (o Outcome) Answered() int {
 	return len(o.Matched) - len(o.Unanswered)
 }

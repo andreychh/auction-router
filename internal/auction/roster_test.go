@@ -14,6 +14,15 @@ type exclusion struct {
 	term    auction.Term
 }
 
+// uids reduces a list of partners to the names an assertion can read.
+func uids(partners []auction.Partner) []auction.PartnerUID {
+	names := make([]auction.PartnerUID, 0, len(partners))
+	for _, partner := range partners {
+		names = append(names, partner.UID)
+	}
+	return names
+}
+
 func TestRosterConsider(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -75,12 +84,8 @@ func TestRosterConsider(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matched, excluded := auction.NewRoster(tt.partners).Consider(tt.lot)
-			gotMatched := make([]auction.PartnerUID, 0, len(matched))
-			for _, partner := range matched {
-				gotMatched = append(gotMatched, partner.UID)
-			}
-			if !slices.Equal(gotMatched, tt.wantMatched) {
-				t.Errorf("matched = %q, want %q", gotMatched, tt.wantMatched)
+			if got := uids(matched); !slices.Equal(got, tt.wantMatched) {
+				t.Errorf("matched = %q, want %q", got, tt.wantMatched)
 			}
 			gotExcluded := make([]exclusion, 0, len(excluded))
 			for _, e := range excluded {
