@@ -1,0 +1,49 @@
+[
+  {
+    "uid": "dsp-alpha",
+    "name": "DSP Alpha",
+    "endpoint": "https://alpha.dsp.example/ok",
+    "is_enabled": true,
+    "countries": ["RU", "KZ"],
+    "device_types": ["mobile", "desktop"],
+    "min_bid_floor": 0.5,
+    "blocked_categories": ["gambling"]
+  },
+  {
+    "uid": "dsp-beta",
+    "name": "DSP Beta",
+    "endpoint": "https://beta.dsp.example/ok",
+    "is_enabled": true,
+    "countries": ["US", "DE"],
+    "min_bid_floor": 0.1
+  },
+  {
+    "uid": "dsp-gamma",
+    "name": "DSP Gamma",
+    "endpoint": "https://gamma.dsp.example/ok",
+    "is_enabled": true,
+    "device_types": ["mobile"],
+    "min_bid_floor": 2.0
+  },
+  {
+    "uid": "dsp-delta",
+    "name": "DSP Delta",
+    "endpoint": "https://delta.dsp.example/error",
+    "is_enabled": true,
+    "countries": ["RU"],
+    "device_types": ["mobile", "tv"]
+  },
+  {
+    "uid": "dsp-omega",
+    "name": "DSP Omega",
+    "endpoint": "https://omega.dsp.example/slow",
+    "is_enabled": true,
+    "countries": ["DE"]
+  },
+  {
+    "uid": "dsp-epsilon",
+    "name": "DSP Epsilon",
+    "endpoint": "https://epsilon.dsp.example/ok",
+    "is_enabled": false
+  }
+]
