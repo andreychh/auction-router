@@ -5,3 +5,31 @@
 
 [env]
 _.file = ".env"
+
+[tasks.run]
+description = "Serve auctions on :8080"
+run = "go run ./cmd/router"
+
+[tasks.build]
+description = "Build the router into bin/"
+run = "go build -o bin/router ./cmd/router"
+
+[tasks.test]
+description = "Run every test under the race detector"
+run = "go test -race ./..."
+
+[tasks.cover]
+description = "Report how much of each package the tests reach"
+run = "go test -cover ./..."
+
+[tasks.fmt]
+description = "Format every Go file in place"
+run = "gofmt -w ."
+
+[tasks.check]
+description = "Vet, check formatting and run the tests: the gate before a commit"
+run = [
+  "go vet ./...",
+  'unformatted=$(gofmt -l .); if [ -n "$unformatted" ]; then echo "not gofmt-ed:"; echo "$unformatted"; exit 1; fi',
+  "go test -race ./...",
+]

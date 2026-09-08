@@ -1,2 +1,5 @@
 # IDE settings
 .idea/
+
+# built binaries
+bin/
