@@ -76,6 +76,12 @@ func run() error {
 	mux := http.NewServeMux()
 	mux.Handle("POST /auction", api.NewAuctionHandler(exchange, logger))
 
+	// Health is the status code and nothing else. A roster that failed to load
+	// stopped the router before it served anything, so there is nothing to report.
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
 	server := &http.Server{
 		Addr:              cfg.address,
 		Handler:           mux,

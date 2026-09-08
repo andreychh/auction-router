@@ -24,15 +24,31 @@ go test -race ./...
 
 Флаги (`mise run run -- -log-level debug`):
 
-| флаг | по умолчанию | что задаёт |
-|---|---|---|
-| `-addr` | `:8080` | адрес, на котором обслуживаются аукционы |
-| `-partners` | `partners.json` | файл с описанием партнёров |
-| `-budget` | `200ms` | сколько времени отведено одному раунду приглашений |
-| `-log-level` | `info` | `debug`, `info`, `warn` или `error` |
+| флаг         | по умолчанию    | что задаёт                                         |
+|--------------|-----------------|----------------------------------------------------|
+| `-addr`      | `:8080`         | адрес, на котором обслуживаются аукционы           |
+| `-partners`  | `partners.json` | файл с описанием партнёров                         |
+| `-budget`    | `200ms`         | сколько времени отведено одному раунду приглашений |
+| `-log-level` | `info`          | `debug`, `info`, `warn` или `error`                |
 
 Останавливается по `Ctrl-C` или `SIGTERM`: перестаёт принимать новые соединения и
 даёт текущим аукционам до пяти секунд на завершение.
+
+Проверка живости — `GET /health`:
+
+```sh
+curl -i -s localhost:8080/health | head -1
+```
+
+```
+HTTP/1.1 204 No Content
+```
+
+Тела нет намеренно: у проверки здоровья весь ответ и есть код состояния, а `{"status":"ok"}`
+был бы JSON, который никто не разбирает. Отдельной проверки готовности нет по той же
+причине — она совпала бы с проверкой живости: реестр читается один раз при старте, и если
+он не прочитался, сервис не начинает обслуживать вовсе. Шаблон маршрута обслуживает и
+`HEAD`, а в лог эти запросы не пишутся, иначе проба раз в секунду забила бы его целиком.
 
 ## Пример: видно, что фильтрация работает
 
@@ -48,7 +64,17 @@ curl -s -X POST localhost:8080/auction \
 ```
 
 ```json
-{"request_id":"r-1","status":"ok","matched_dsps":["dsp-alpha","dsp-delta"],"sent":2,"succeeded":1,"duration_ms":0}
+{
+  "request_id": "r-1",
+  "status": "ok",
+  "matched_dsps": [
+    "dsp-alpha",
+    "dsp-delta"
+  ],
+  "sent": 2,
+  "succeeded": 1,
+  "duration_ms": 0
+}
 ```
 
 **Добавляем категорию `gambling`** — `dsp-alpha` её блокирует и выпадает:
@@ -59,7 +85,16 @@ curl -s -X POST localhost:8080/auction \
 ```
 
 ```json
-{"request_id":"r-2","status":"ok","matched_dsps":["dsp-delta"],"sent":1,"succeeded":0,"duration_ms":0}
+{
+  "request_id": "r-2",
+  "status": "ok",
+  "matched_dsps": [
+    "dsp-delta"
+  ],
+  "sent": 1,
+  "succeeded": 0,
+  "duration_ms": 0
+}
 ```
 
 **Поднимаем цену до 3.0** — теперь дотягивается `dsp-gamma` с порогом 2.0, и партнёров
@@ -71,7 +106,18 @@ curl -s -X POST localhost:8080/auction \
 ```
 
 ```json
-{"request_id":"r-3","status":"ok","matched_dsps":["dsp-alpha","dsp-gamma","dsp-delta"],"sent":3,"succeeded":2,"duration_ms":0}
+{
+  "request_id": "r-3",
+  "status": "ok",
+  "matched_dsps": [
+    "dsp-alpha",
+    "dsp-gamma",
+    "dsp-delta"
+  ],
+  "sent": 3,
+  "succeeded": 2,
+  "duration_ms": 0
+}
 ```
 
 **Меняем страну на DE** — попадаем на `dsp-omega`, который не отвечает никогда.
@@ -84,7 +130,17 @@ curl -s -X POST localhost:8080/auction \
 ```
 
 ```json
-{"request_id":"r-4","status":"ok","matched_dsps":["dsp-beta","dsp-omega"],"sent":2,"succeeded":1,"duration_ms":201}
+{
+  "request_id": "r-4",
+  "status": "ok",
+  "matched_dsps": [
+    "dsp-beta",
+    "dsp-omega"
+  ],
+  "sent": 2,
+  "succeeded": 1,
+  "duration_ms": 201
+}
 ```
 
 **Никто не подошёл** — это штатный ответ, 200 с пустым списком и статусом
@@ -96,7 +152,14 @@ curl -s -X POST localhost:8080/auction \
 ```
 
 ```json
-{"request_id":"r-5","status":"no_matched_dsps","matched_dsps":[],"sent":0,"succeeded":0,"duration_ms":0}
+{
+  "request_id": "r-5",
+  "status": "no_matched_dsps",
+  "matched_dsps": [],
+  "sent": 0,
+  "succeeded": 0,
+  "duration_ms": 0
+}
 ```
 
 **Негодный запрос** — 400, и все претензии сразу, а не первая по счёту:
@@ -116,9 +179,6 @@ curl -s -X POST localhost:8080/auction \
   ]
 }
 ```
-
-`GET /auction` отвечает `405` и заголовком `Allow: POST` — метод указан в шаблоне
-маршрута, так что этим занимается сам мультиплексор.
 
 ## Логи
 
@@ -155,14 +215,14 @@ mise run run -- -log-level debug
 Сейчас там шесть партнёров, подобранных так, чтобы каждое правило претаргетинга
 отсекало кого-нибудь:
 
-| uid | окончание | страны | устройства | пол цены | блокирует |
-|---|---|---|---|---|---|
-| `dsp-alpha` | `/ok` | RU, KZ | mobile, desktop | 0.5 | gambling |
-| `dsp-beta` | `/ok` | US, DE | любые | 0.1 | — |
-| `dsp-gamma` | `/ok` | любые | mobile | 2.0 | — |
-| `dsp-delta` | `/error` | RU | mobile, tv | 0 | — |
-| `dsp-omega` | `/slow` | DE | любые | 0 | — |
-| `dsp-epsilon` | `/ok` | выключен | | | |
+| uid           | окончание | страны   | устройства      | пол цены | блокирует |
+|---------------|-----------|----------|-----------------|----------|-----------|
+| `dsp-alpha`   | `/ok`     | RU, KZ   | mobile, desktop | 0.5      | gambling  |
+| `dsp-beta`    | `/ok`     | US, DE   | любые           | 0.1      | —         |
+| `dsp-gamma`   | `/ok`     | любые    | mobile          | 2.0      | —         |
+| `dsp-delta`   | `/error`  | RU       | mobile, tv      | 0        | —         |
+| `dsp-omega`   | `/slow`   | DE       | любые           | 0        | —         |
+| `dsp-epsilon` | `/ok`     | выключен |                 |          |           |
 
 Минимальная запись — четыре обязательных поля:
 
