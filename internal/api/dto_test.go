@@ -2,7 +2,6 @@ package api_test
 
 import (
 	"encoding/json"
-	"errors"
 	"reflect"
 	"slices"
 	"strings"
@@ -93,22 +92,19 @@ func TestParseLot(t *testing.T) {
 // the complaint itself to the package that judged the value.
 func TestParseLotRefusals(t *testing.T) {
 	tests := []struct {
-		name    string
-		wire    api.AuctionRequest
-		missing bool
-		want    []string
+		name string
+		wire api.AuctionRequest
+		want []string
 	}{
 		{
-			name:    "a request naming nothing is missing every required field",
-			wire:    api.AuctionRequest{},
-			missing: true,
-			want:    []string{"required fields are missing: request_id, country, device_type"},
+			name: "a request naming nothing is missing every required field",
+			wire: api.AuctionRequest{},
+			want: []string{"required fields are missing: request_id, country, device_type"},
 		},
 		{
-			name:    "one absent field is named alone",
-			wire:    api.AuctionRequest{RequestID: new("r-1"), DeviceType: new("mobile")},
-			missing: true,
-			want:    []string{"required fields are missing: country"},
+			name: "one absent field is named alone",
+			wire: api.AuctionRequest{RequestID: new("r-1"), DeviceType: new("mobile")},
+			want: []string{"required fields are missing: country"},
 		},
 		{
 			// Judging a value the request never sent is not possible, so the
@@ -118,8 +114,7 @@ func TestParseLotRefusals(t *testing.T) {
 				RequestID:  new("r-1"),
 				DeviceType: new("fridge"),
 			},
-			missing: true,
-			want:    []string{"required fields are missing: country"},
+			want: []string{"required fields are missing: country"},
 		},
 		{
 			name: "a country that is not a two-letter code",
@@ -178,10 +173,6 @@ func TestParseLotRefusals(t *testing.T) {
 			_, err := api.ParseLot(tt.wire)
 			if err == nil {
 				t.Fatal("ParseLot() returned no error, want the request refused")
-			}
-			if got := errors.Is(err, api.ErrFieldsMissing); got != tt.missing {
-				t.Errorf("errors.Is(err, ErrFieldsMissing) = %v, want %v; err = %v",
-					got, tt.missing, err)
 			}
 			// Joined complaints print one per line, which is how the handler
 			// hands them to a publisher as separate items.

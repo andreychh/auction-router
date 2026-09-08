@@ -18,10 +18,6 @@ const (
 	StatusNoMatchedDSPs Status = "no_matched_dsps"
 )
 
-// ErrFieldsMissing reports a request that left out required fields, naming them
-// all.
-var ErrFieldsMissing = errors.New("required fields are missing")
-
 // AuctionRequest is the wire form of a lot a publisher offers for sale, naming
 // the fields as JSON spells them.
 //
@@ -55,7 +51,8 @@ func ParseLot(wire AuctionRequest) (auction.Lot, error) {
 		missing = append(missing, "device_type")
 	}
 	if len(missing) > 0 {
-		return auction.Lot{}, fmt.Errorf("%w: %s", ErrFieldsMissing, strings.Join(missing, ", "))
+		return auction.Lot{}, fmt.Errorf("required fields are missing: %s",
+			strings.Join(missing, ", "))
 	}
 
 	var problems []error
