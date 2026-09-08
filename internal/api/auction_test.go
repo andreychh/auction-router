@@ -177,17 +177,20 @@ func TestAuctionHandlerServeHTTP(t *testing.T) {
 
 	// Every complaint arrives as its own item. Joined errors print as one string
 	// with newlines in it, which a publisher would have to split apart itself.
+	// The complaints about the list arrive joined already, so this is also where
+	// a nested join has to be flattened rather than rendered.
 	t.Run("a request of bad values is answered with each complaint apart", func(t *testing.T) {
 		w := serve(unwanted(t), request(
-			`{"request_id":"r-1","country":"russia","device_type":"fridge","bid_floor":-1}`,
+			`{"request_id":"r-1","country":"russia","device_type":"fridge","bid_floor":-1,`+
+				`"categories":[""," news"]}`,
 		))
 
 		if w.Code != http.StatusBadRequest {
 			t.Errorf("status = %d, want %d", w.Code, http.StatusBadRequest)
 		}
 		got := refusal(t, w)
-		if len(got.Details) != 3 {
-			t.Fatalf("details = %q, want one item for each of the three bad values", got.Details)
+		if len(got.Details) != 5 {
+			t.Fatalf("details = %q, want one item for each of the five bad values", got.Details)
 		}
 		for _, complaint := range got.Details {
 			if strings.Contains(complaint, "\n") {

@@ -8,6 +8,7 @@ import (
 	"net/http"
 
 	"github.com/andreychh/auction-router/internal/auction"
+	"github.com/andreychh/auction-router/internal/parsing"
 )
 
 // maxRequestBodySize bounds the JSON a publisher may post. A lot runs to a few
@@ -39,12 +40,11 @@ func (h *AuctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBodySize)).Decode(&wire)
 	if err != nil {
 		if _, ok := errors.AsType[*http.MaxBytesError](err); ok {
-			h.refuse(ctx, w, http.StatusRequestEntityTooLarge, orZero(wire.RequestID), ErrorResponse{
-				Error: "request body is too large",
-			})
+			h.refuse(ctx, w, http.StatusRequestEntityTooLarge, parsing.OrZero(wire.RequestID),
+				ErrorResponse{Error: "request body is too large"})
 			return
 		}
-		h.refuse(ctx, w, http.StatusBadRequest, orZero(wire.RequestID), ErrorResponse{
+		h.refuse(ctx, w, http.StatusBadRequest, parsing.OrZero(wire.RequestID), ErrorResponse{
 			Error:   "request body could not be read as an auction request",
 			Details: []string{err.Error()},
 		})
@@ -53,7 +53,7 @@ func (h *AuctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	lot, err := ParseLot(wire)
 	if err != nil {
-		h.refuse(ctx, w, http.StatusBadRequest, orZero(wire.RequestID), ErrorResponse{
+		h.refuse(ctx, w, http.StatusBadRequest, parsing.OrZero(wire.RequestID), ErrorResponse{
 			Error:   "request does not describe a lot the exchange can sell",
 			Details: problems(err),
 		})
@@ -113,8 +113,8 @@ func (h *AuctionHandler) refuse(
 }
 
 // reply sends payload as the whole of the response, encoding before it writes
-// the status: a payload that will not render becomes a 500, not a truncated body
-// under a 200.
+// the status: a payload that will not render becomes a 500, not a truncated
+// body under a 200.
 func (h *AuctionHandler) reply(ctx context.Context, w http.ResponseWriter, status int, payload any) {
 	body, err := json.Marshal(payload)
 	if err != nil {

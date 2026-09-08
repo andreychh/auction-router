@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/andreychh/auction-router/internal/auction"
+	"github.com/andreychh/auction-router/internal/parsing"
 )
 
 // Status says whether a lot found any partner to hear it.
@@ -67,18 +68,13 @@ func ParseLot(wire AuctionRequest) (auction.Lot, error) {
 		problems = append(problems, fmt.Errorf("device_type: %w", err))
 	}
 	// No floor named means no floor, which the exchange reads as zero.
-	bidFloor, err := auction.ParsePrice(orZero(wire.BidFloor))
+	bidFloor, err := auction.ParsePrice(parsing.OrZero(wire.BidFloor))
 	if err != nil {
 		problems = append(problems, fmt.Errorf("bid_floor: %w", err))
 	}
-	var categories []auction.Category
-	for i, name := range wire.Categories {
-		category, err := auction.ParseCategory(name)
-		if err != nil {
-			problems = append(problems, fmt.Errorf("categories[%d]: %w", i, err))
-			continue
-		}
-		categories = append(categories, category)
+	categories, err := parsing.ParseSlice("categories", wire.Categories, auction.ParseCategory)
+	if err != nil {
+		problems = append(problems, err)
 	}
 	if len(problems) > 0 {
 		return auction.Lot{}, errors.Join(problems...)
@@ -118,15 +114,6 @@ func NewAuctionResponse(requestID string, outcome auction.Outcome) AuctionRespon
 		Succeeded:   outcome.Answered(),
 		DurationMS:  outcome.Elapsed.Milliseconds(),
 	}
-}
-
-// orZero returns what p points at, or the zero value where p is nil.
-func orZero[T any](p *T) T {
-	if p == nil {
-		var zero T
-		return zero
-	}
-	return *p
 }
 
 // ErrorResponse is the answer to a refused request: what was wrong with it, and
