@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"mime"
 	"net/http"
 
 	"github.com/andreychh/auction-router/internal/auction"
@@ -14,6 +16,10 @@ import (
 // maxRequestBodySize bounds the JSON a publisher may post. A lot runs to a few
 // hundred bytes, so anything near this bound is a broken or hostile caller.
 const maxRequestBodySize = 64 << 10
+
+// mediaTypeJSON is the only form a lot may be posted in, and the form every
+// answer is sent in.
+const mediaTypeJSON = "application/json"
 
 // Auctioneer holds an auction for a lot and reports what came of it. Finding no
 // buyer is an outcome, not a failure, so there is no error to return.
@@ -36,6 +42,14 @@ func NewAuctionHandler(auctioneer Auctioneer, logger *slog.Logger) *AuctionHandl
 func (h *AuctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
+	if err := h.checkMediaType(r.Header.Get("Content-Type")); err != nil {
+		h.refuse(ctx, w, http.StatusUnsupportedMediaType, "", ErrorResponse{
+			Error:   "request body must be declared as " + mediaTypeJSON,
+			Details: []string{err.Error()},
+		})
+		return
+	}
+
 	var wire AuctionRequest
 	err := json.NewDecoder(http.MaxBytesReader(w, r.Body, maxRequestBodySize)).Decode(&wire)
 	if err != nil {
@@ -55,7 +69,7 @@ func (h *AuctionHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.refuse(ctx, w, http.StatusBadRequest, parsing.OrZero(wire.RequestID), ErrorResponse{
 			Error:   "request does not describe a lot the exchange can sell",
-			Details: problems(err),
+			Details: h.problems(err),
 		})
 		return
 	}
@@ -122,17 +136,33 @@ func (h *AuctionHandler) reply(ctx context.Context, w http.ResponseWriter, statu
 		http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", mediaTypeJSON)
 	w.WriteHeader(status)
 	if _, err := w.Write(body); err != nil {
 		h.logger.WarnContext(ctx, "response could not be delivered", "error", err)
 	}
 }
 
+// checkMediaType reports whether a body declared by header may be read as
+// JSON. Parameters are disregarded, an undeclared body refused.
+func (*AuctionHandler) checkMediaType(header string) error {
+	if header == "" {
+		return errors.New("Content-Type is absent")
+	}
+	media, _, err := mime.ParseMediaType(header)
+	if err != nil {
+		return fmt.Errorf("Content-Type %q cannot be read: %w", header, err)
+	}
+	if media != mediaTypeJSON {
+		return fmt.Errorf("Content-Type is %q", media)
+	}
+	return nil
+}
+
 // problems flattens err into one message per complaint it carries, however many
 // levels errors were joined at, so that a publisher reads its mistakes as
 // separate items instead of one string with newlines buried in it.
-func problems(err error) []string {
+func (h *AuctionHandler) problems(err error) []string {
 	joined, ok := err.(interface{ Unwrap() []error })
 	if !ok {
 		return []string{err.Error()}
@@ -140,7 +170,7 @@ func problems(err error) []string {
 
 	var flattened []string
 	for _, nested := range joined.Unwrap() {
-		flattened = append(flattened, problems(nested)...)
+		flattened = append(flattened, h.problems(nested)...)
 	}
 	return flattened
 }

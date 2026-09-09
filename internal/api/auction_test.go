@@ -38,9 +38,21 @@ func serve(a api.Auctioneer, r *http.Request) *httptest.ResponseRecorder {
 	return w
 }
 
-// request builds the POST a publisher makes.
+// request builds the POST a publisher makes, declared as the JSON it is.
 func request(body string) *http.Request {
-	return httptest.NewRequest(http.MethodPost, "/auction", strings.NewReader(body))
+	r := httptest.NewRequest(http.MethodPost, "/auction", strings.NewReader(body))
+	r.Header.Set("Content-Type", "application/json")
+	return r
+}
+
+// declared builds the same POST under a media type of the test's choosing,
+// where an empty one means the header is left off altogether.
+func declared(body, mediaType string) *http.Request {
+	r := httptest.NewRequest(http.MethodPost, "/auction", strings.NewReader(body))
+	if mediaType != "" {
+		r.Header.Set("Content-Type", mediaType)
+	}
+	return r
 }
 
 // refusal reads the answer to a refused request.
@@ -141,6 +153,47 @@ func TestAuctionHandlerServeHTTP(t *testing.T) {
 
 		if !reached {
 			t.Error("the auctioneer was handed a context of its own, want the request's")
+		}
+	})
+
+	// A body is read only once it says what it is. A client that mislabels what
+	// it sends is misconfigured, and reading it anyway would make the label a
+	// decoration.
+	t.Run("a body not declared as JSON is refused unread", func(t *testing.T) {
+		tests := []struct {
+			name      string
+			mediaType string
+		}{
+			{name: "another media type entirely", mediaType: "text/plain"},
+			{name: "the form curl -d sends by default", mediaType: "application/x-www-form-urlencoded"},
+			{name: "no declaration at all", mediaType: ""},
+			{name: "a declaration that does not parse", mediaType: "application/json; charset"},
+		}
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				w := serve(unwanted(t), declared(lot, tt.mediaType))
+
+				if w.Code != http.StatusUnsupportedMediaType {
+					t.Errorf("status = %d, want %d", w.Code, http.StatusUnsupportedMediaType)
+				}
+				if got := refusal(t, w); got.Error == "" {
+					t.Error("the refusal says nothing about what was wrong")
+				}
+			})
+		}
+	})
+
+	// The parameters a media type carries say how to read a body, not what is in
+	// it, so naming a charset must not cost a publisher its auction.
+	t.Run("JSON declared with parameters is read all the same", func(t *testing.T) {
+		held := auctioneer(func(context.Context, auction.Lot) auction.Outcome {
+			return auction.NewOutcome(matched("alpha"), nil, nil, time.Millisecond)
+		})
+
+		w := serve(held, declared(lot, "application/json; charset=utf-8"))
+
+		if w.Code != http.StatusOK {
+			t.Errorf("status = %d, want %d", w.Code, http.StatusOK)
 		}
 	})
 

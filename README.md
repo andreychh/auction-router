@@ -60,6 +60,7 @@ HTTP/1.1 204 No Content
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-1","country":"RU","device_type":"mobile","bid_floor":1.5}'
 ```
 
@@ -81,6 +82,7 @@ curl -s -X POST localhost:8080/auction \
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-2","country":"RU","device_type":"mobile","bid_floor":1.5,"categories":["gambling"]}'
 ```
 
@@ -102,6 +104,7 @@ curl -s -X POST localhost:8080/auction \
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-3","country":"RU","device_type":"mobile","bid_floor":3.0}'
 ```
 
@@ -126,6 +129,7 @@ curl -s -X POST localhost:8080/auction \
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-4","country":"DE","device_type":"mobile","bid_floor":1.5}'
 ```
 
@@ -148,6 +152,7 @@ curl -s -X POST localhost:8080/auction \
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-5","country":"JP","device_type":"tv","bid_floor":99}'
 ```
 
@@ -166,6 +171,7 @@ curl -s -X POST localhost:8080/auction \
 
 ```sh
 curl -s -X POST localhost:8080/auction \
+  -H 'Content-Type: application/json' \
   -d '{"request_id":"r-6","country":"russia","device_type":"fridge","bid_floor":-1}'
 ```
 
@@ -310,6 +316,12 @@ internal/fakedsp    подставные партнёры
 **Страна проверяется только по форме**, две заглавные латинские буквы, без сверки со
 справочником ISO. Это намеренно: `XK` (Косово) в стандарте отсутствует, но его отдают и
 MaxMind, и Евростат, а отвергнутый лот — это потерянные деньги.
+
+**Тело читается только после того, как заявлено.** Запрос без `Content-Type:
+application/json` получает `415`, и заголовок без него — тоже: угадывать, что лежит в
+необъявленном теле, сервис не берётся. Параметры вроде `; charset=utf-8` при этом
+безразличны — они говорят, как читать тело, а не что в нём. Отсюда `-H` в каждом примере
+выше: `curl -d` по умолчанию объявляет тело формой.
 
 **Тело запроса ограничено 64 КиБ**, и всё, что больше, получает `413`. У `net/http` нет
 ограничения на тело по умолчанию — только на заголовки, — так что один клиент с
